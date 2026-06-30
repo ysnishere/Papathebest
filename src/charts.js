@@ -12,6 +12,7 @@
 
   let bsChart = null;
   let cardioChart = null;
+  let carbsChart = null;
 
   // Muji 色票
   const C = {
@@ -195,11 +196,39 @@
       cards.push(card('💓 阻力訓練 × 心血管', msg, 'mist'));
     }
 
+    // 份量 × 代謝量：用醣類紅綠燈比例 ＋ 爸爸的 TDEE 給份量建議
+    const meals = data.daily_records.filter(r => r.meals && ['low', 'medium', 'high'].includes(r.meals.carbs_estimated));
+    if (meals.length) {
+      const high = meals.filter(r => r.meals.carbs_estimated === 'high').length;
+      let msg;
+      if (high === 0) {
+        msg = `最近記錄的 ${meals.length} 餐都沒有🔴醣類較多的，份量控制得很棒，繼續保持！`;
+      } else {
+        const pct = Math.round((high / meals.length) * 100);
+        msg = `最近 ${meals.length} 餐裡有 <b>${high}</b> 餐被標為🔴醣類較多（約 ${pct}%）`;
+        const tdee = estimateTDEE(data.profile);
+        if (tdee) {
+          msg += `。以爸爸每天約 <b>${tdee.toLocaleString()}</b> 大卡的需求，紅燈餐建議再收斂一點，多換成🟢🟡，血糖會更穩。`;
+        } else {
+          msg += `，建議多換成🟢🟡，血糖會更穩。（到「我的資料」填基本資料，這裡就會用您的代謝量給更貼切的建議）`;
+        }
+      }
+      cards.push(card('🍽️ 份量 × 代謝量', '洞察：' + msg, 'wood'));
+    }
+
     if (cards.length === 0) {
       box.innerHTML = card('🌱 還在累積資料', '多記錄幾筆「運動前 / 運動後」的血糖與心跳，這裡就會自動算出爸爸的運動成效囉！', 'sage');
     } else {
       box.innerHTML = cards.join('');
     }
+  }
+
+  /** 由個人資料估算每日建議熱量 TDEE（與 main.js 同公式），無資料回 null */
+  function estimateTDEE(p) {
+    if (!p || p.height == null || p.weight == null || p.age == null) return null;
+    let bmr = 10 * Number(p.weight) + 6.25 * Number(p.height) - 5 * Number(p.age);
+    bmr += (p.sex === 'female') ? -161 : 5;
+    return Math.round(bmr * (Number(p.activity) || 1.2));
   }
 
   /** 計算某有氧運動的平均血糖下降量（運動前 − 運動後，正值＝下降） */
@@ -234,8 +263,38 @@
       </div>`;
   }
 
+  // ---------- 圖三：每日醣類紅綠燈分布（堆疊長條） ----------
+  function renderCarbs(data) {
+    const byDate = {};
+    data.daily_records.forEach(r => {
+      const d = (r.timestamp || '').slice(0, 10);
+      const c = r.meals && r.meals.carbs_estimated;
+      if (!d || !['low', 'medium', 'high'].includes(c)) return;
+      byDate[d] = byDate[d] || { low: 0, medium: 0, high: 0 };
+      byDate[d][c]++;
+    });
+
+    const dates = Object.keys(byDate).sort().slice(-7); // 最近 7 天
+    const labels = dates.map(d => { const [, m, dd] = d.split('-'); return `${+m}/${+dd}`; });
+
+    const ctx = $('#chart-carbs');
+    if (carbsChart) carbsChart.destroy();
+    carbsChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: '🟢 較少', data: dates.map(d => byDate[d].low), backgroundColor: C.sage },
+          { label: '🟡 中等', data: dates.map(d => byDate[d].medium), backgroundColor: '#E0C878' },
+          { label: '🔴 較多', data: dates.map(d => byDate[d].high), backgroundColor: '#D98C8C' },
+        ],
+      },
+      options: baseOptions({ yTitle: '餐數', stacked: true }),
+    });
+  }
+
   // ---------- 共用設定 ----------
-  function baseOptions({ yTitle, time }) {
+  function baseOptions({ yTitle, time, stacked }) {
     const opts = {
       responsive: true,
       interaction: { mode: 'nearest', intersect: false },
@@ -245,10 +304,12 @@
       },
       scales: {
         y: {
+          stacked: !!stacked,
           title: { display: !!yTitle, text: yTitle, color: C.inkSoft, font: { size: 13 } },
-          grid: { color: C.grid }, ticks: { color: C.inkSoft, font: { size: 13 } },
+          grid: { color: C.grid }, ticks: { color: C.inkSoft, font: { size: 13 }, precision: 0 },
         },
         x: {
+          stacked: !!stacked,
           grid: { color: C.grid }, ticks: { color: C.inkSoft, font: { size: 13 } },
         },
       },
@@ -273,6 +334,7 @@
     renderInsights(data);
     renderBloodSugar(data);
     renderCardio(data);
+    renderCarbs(data);
   };
 
   document.addEventListener('DOMContentLoaded', () => {
