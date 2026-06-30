@@ -23,6 +23,35 @@
     '每一筆紀錄，都是爸爸愛自己、也愛我們的證明 💛',
     '健康的爸爸，是我們全家的寶藏！',
     '繼續加油，爸爸的努力我們都看在眼裡 ✨',
+    // ─── 闖關成功風格 ───
+    '✅ 今天又過一關，我們都替你驕傲！',
+    '💪 爸爸加油，全家都是你的隊友！',
+    '❤️ 每完成一步，離健康更近一步。',
+    '🌱 今天的努力，就是明天的健康。',
+    '🎉 任務完成！給你一個大大的擁抱。',
+    '🥰 爸爸，你真的很帥，偶像 😍！',
+    '⭐ 爸爸，繼續闖關，我們陪你！',
+    '🏆 今天的冠軍，是努力的你。',
+    '🌈 一點一滴累積，就是最棒的進步。',
+    '👏 今天比昨天更厲害了！',
+    '❤️ 我們最大的願望，就是陪你一直健康。',
+    '🚀 每天完成任務，就是在守護這個家。',
+    '🌟 血糖穩一點，幸福就多一點。',
+    '🥇 健康挑戰成功，全家一起歡呼 🎉',
+    '🤗 你的努力，我們都看見了，感到很安心。',
+  ];
+
+  // 模組 B＋：闖關成就面板的獎勵小項（每次隨機抽幾條疊起來呈現）
+  const ACHIEVEMENT_POOL = [
+    '💚 血糖守護成功！老婆安心 +10',
+    '👧 女兒開心值 +5',
+    '👦 兒子驕傲值 +5',
+    '🏡 家庭幸福值 +10',
+    '⭐ 連續完成，好習慣養成中！',
+    '🛡️ 健康存款 +1',
+    '❤️ 今天的努力，都是送給家人的愛。',
+    '🏅 每天一小步，全家一大步。',
+    '🎊 恭喜過關！明天繼續一起加油！',
   ];
 
   // ---------- 資料層：LocalStorage 增刪查改 ----------
@@ -114,12 +143,39 @@
   const PERIOD_LABEL = { fasting: '空腹', before_meal: '餐前', after_meal_2h: '餐後2h' };
 
   // ---------- 模組 B：愛的鼓勵彈窗 ----------
+  const ACHIEVEMENT_CHANCE = 0.4; // 約 4 成機率改顯示「闖關成就面板」
+
+  /** 從陣列隨機抽 n 個不重複元素 */
+  function pickRandom(arr, n) {
+    const copy = arr.slice();
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy.slice(0, n);
+  }
+
   function showLoveToast() {
     const overlay = $('#love-toast');
     const card = $('#love-card');
     const text = $('#love-text');
+    const emoji = $('#love-emoji');
 
-    text.textContent = LOVE_MESSAGES[Math.floor(Math.random() * LOVE_MESSAGES.length)];
+    if (Math.random() < ACHIEVEMENT_CHANCE) {
+      // 闖關成就面板：第幾關 = 累積總筆數（含剛存的這筆）
+      const data = Store.read();
+      const level = data.daily_records.length + data.exercise_records.length;
+      const lines = [`🎯 第 ${level} 關完成！健康值 +1`, ...pickRandom(ACHIEVEMENT_POOL, 4)];
+      emoji.textContent = '🏆';
+      text.innerHTML =
+        '<div class="text-left text-lg font-medium text-ink space-y-2">' +
+        lines.map(l => `<div>${l}</div>`).join('') +
+        '</div>';
+    } else {
+      // 一般溫馨小語
+      emoji.textContent = '❤️';
+      text.textContent = LOVE_MESSAGES[Math.floor(Math.random() * LOVE_MESSAGES.length)];
+    }
 
     overlay.classList.remove('hidden');
     overlay.classList.add('flex');
