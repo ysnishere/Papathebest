@@ -113,15 +113,90 @@
 
     <!-- Tabs -->
     <div class="max-w-4xl mx-auto px-5 pb-3">
-      <div class="grid grid-cols-3 gap-2 bg-[#EFE9DF] p-1.5 rounded-2xl">
-        <button data-tab="input" class="tab-btn active text-base sm:text-lg font-medium py-3 rounded-xl text-inkSoft transition">📝 數據輸入</button>
-        <button data-tab="analytics" class="tab-btn text-base sm:text-lg font-medium py-3 rounded-xl text-inkSoft transition">📊 健康圖表</button>
-        <button data-tab="diet" class="tab-btn text-base sm:text-lg font-medium py-3 rounded-xl text-inkSoft transition">🍎 飲食指南</button>
+      <div class="grid grid-cols-4 gap-1.5 bg-[#EFE9DF] p-1.5 rounded-2xl">
+        <button data-tab="profile" class="tab-btn text-sm sm:text-base font-medium py-3 rounded-xl text-inkSoft transition leading-tight">👤<br class="sm:hidden">我的資料</button>
+        <button data-tab="input" class="tab-btn active text-sm sm:text-base font-medium py-3 rounded-xl text-inkSoft transition leading-tight">📝<br class="sm:hidden">數據輸入</button>
+        <button data-tab="analytics" class="tab-btn text-sm sm:text-base font-medium py-3 rounded-xl text-inkSoft transition leading-tight">📊<br class="sm:hidden">健康圖表</button>
+        <button data-tab="diet" class="tab-btn text-sm sm:text-base font-medium py-3 rounded-xl text-inkSoft transition leading-tight">🍎<br class="sm:hidden">飲食指南</button>
       </div>
     </div>
   </header>
 
   <main class="max-w-4xl mx-auto px-5 py-6 pb-24">
+
+    <!-- ============ 面版〇：我的資料（入口頁，算 BMI / BMR / 每日熱量） ============ -->
+    <section id="panel-profile" class="tab-panel space-y-6">
+
+      <div class="bg-cream rounded-3xl shadow-card border border-[#EFE9DF] p-6 text-center">
+        <div class="text-5xl mb-2">👤</div>
+        <h2 class="text-2xl font-bold text-woodDk mb-1">爸爸的基本資料</h2>
+        <p class="text-[1.05rem] text-inkSoft leading-relaxed">填一次就好，幫您算出 BMI、基礎代謝率，<br class="sm:hidden" />還有每天大概需要多少熱量 💪</p>
+      </div>
+
+      <form id="form-profile" class="bg-cream rounded-3xl shadow-card border border-[#EFE9DF] p-6 space-y-5">
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label class="field-label">身高（公分 cm）</label>
+            <input type="number" name="height" step="0.1" class="field-input" placeholder="例如 170" required />
+          </div>
+          <div>
+            <label class="field-label">體重（公斤 kg）</label>
+            <input type="number" name="weight" step="0.1" class="field-input" placeholder="例如 68" required />
+          </div>
+          <div>
+            <label class="field-label">年齡（歲）</label>
+            <input type="number" name="age" class="field-input" placeholder="例如 62" required />
+          </div>
+          <div>
+            <label class="field-label">生理性別</label>
+            <select name="sex" class="field-input">
+              <option value="male">男</option>
+              <option value="female">女</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="field-label">平常的活動量</label>
+          <select name="activity" class="field-input">
+            <option value="1.2">久坐（幾乎不太動）</option>
+            <option value="1.375" selected>輕度（每週走路/運動 1～3 天）</option>
+            <option value="1.55">中度（每週運動 3～5 天）</option>
+            <option value="1.725">高度（每週運動 6～7 天）</option>
+            <option value="1.9">很高（粗重工作 / 每天劇烈運動）</option>
+          </select>
+        </div>
+
+        <button type="submit" class="w-full text-xl font-bold py-4 rounded-2xl bg-wood text-white shadow-soft hover:bg-woodDk active:scale-[.99] transition">
+          🧮 計算並儲存
+        </button>
+      </form>
+
+      <!-- 計算結果 -->
+      <div id="profile-results" class="hidden space-y-4">
+        <div class="grid sm:grid-cols-3 gap-4">
+          <div class="bg-cream rounded-3xl shadow-card border border-[#EFE9DF] p-5 text-center">
+            <div class="text-inkSoft mb-1">BMI 身體質量指數</div>
+            <div id="res-bmi" class="text-4xl font-bold text-woodDk">—</div>
+            <div id="res-bmi-cat" class="mt-2 inline-block px-3 py-1 rounded-full text-base font-medium">—</div>
+          </div>
+          <div class="bg-cream rounded-3xl shadow-card border border-[#EFE9DF] p-5 text-center">
+            <div class="text-inkSoft mb-1">BMR 基礎代謝率</div>
+            <div class="text-4xl font-bold text-sage"><span id="res-bmr">—</span></div>
+            <div class="mt-2 text-sm text-inkSoft">大卡/天（什麼都不做也會消耗）</div>
+          </div>
+          <div class="bg-cream rounded-3xl shadow-card border border-[#EFE9DF] p-5 text-center">
+            <div class="text-inkSoft mb-1">每日建議熱量 TDEE</div>
+            <div class="text-4xl font-bold text-mist"><span id="res-tdee">—</span></div>
+            <div class="mt-2 text-sm text-inkSoft">大卡/天（維持目前體重）</div>
+          </div>
+        </div>
+        <div class="bg-gradient-to-b from-cream to-[#FBEEE6] rounded-3xl border border-[#F0E2D6] p-5 text-center text-[1.02rem] text-ink leading-relaxed">
+          <span id="res-advice"></span><br>
+          <span class="text-sm text-inkSoft">※ 此為一般估算（Mifflin-St Jeor 公式），實際熱量與飲食請以醫師、營養師建議為準。</span>
+        </div>
+      </div>
+    </section>
 
     <!-- ============ 面版一：數據輸入 ============ -->
     <section id="panel-input" class="tab-panel active space-y-6">

@@ -70,6 +70,7 @@
         const data = JSON.parse(raw);
         data.daily_records = data.daily_records || [];
         data.exercise_records = data.exercise_records || [];
+        data.profile = data.profile || null;
         return data;
       } catch (e) {
         console.error('讀取資料失敗，回傳空資料：', e);
@@ -112,9 +113,22 @@
       Store.write(data);
     },
 
+    /** 儲存個人基本資料（身高體重等） */
+    saveProfile(profile) {
+      const data = Store.read();
+      data.profile = profile;
+      Store.write(data);
+      return profile;
+    },
+
+    getProfile() {
+      return Store.read().profile;
+    },
+
     _empty() {
       return {
         meta: { patient: '楊忪霖', version: 1 },
+        profile: null,
         daily_records: [],
         exercise_records: [],
       };
@@ -398,15 +412,18 @@
           const seenE = new Set(cur.exercise_records.map(r => r.exercise_id));
           (incoming.daily_records || []).forEach(r => { if (!seenD.has(r.record_id)) cur.daily_records.push(r); });
           (incoming.exercise_records || []).forEach(r => { if (!seenE.has(r.exercise_id)) cur.exercise_records.push(r); });
+          if (!cur.profile && incoming.profile) cur.profile = incoming.profile; // 沒有才補上
           Store.write(cur);
         } else {
           Store.write({
             meta: incoming.meta || {},
+            profile: incoming.profile || null,
             daily_records: incoming.daily_records || [],
             exercise_records: incoming.exercise_records || [],
           });
         }
         renderRecent();
+        prefillProfile();
         if (typeof window.refreshCharts === 'function') window.refreshCharts();
         alert('匯入完成！✅');
       } catch (e) {
@@ -462,6 +479,83 @@
     } else {
       prompt('複製下面的文字貼到群組：', text);
     }
+  }
+
+  // ---------- 個人資料：BMI / BMR / TDEE ----------
+  /** 依身高體重年齡性別活動量計算健康指標（Mifflin-St Jeor） */
+  function computeMetrics(p) {
+    const h = Number(p.height), w = Number(p.weight), age = Number(p.age);
+    const act = Number(p.activity) || 1.2;
+    const bmi = w / Math.pow(h / 100, 2);
+    let bmr = 10 * w + 6.25 * h - 5 * age;
+    bmr += (p.sex === 'female') ? -161 : 5;
+    const tdee = bmr * act;
+
+    // 台灣衛福部 BMI 分級
+    let cat, color;
+    if (bmi < 18.5) { cat = '體重過輕'; color = 'mist'; }
+    else if (bmi < 24) { cat = '健康體位'; color = 'sage'; }
+    else if (bmi < 27) { cat = '體重過重'; color = 'amber'; }
+    else { cat = '肥胖'; color = 'red'; }
+
+    return { bmi: Math.round(bmi * 10) / 10, bmr: Math.round(bmr), tdee: Math.round(tdee), cat, color };
+  }
+
+  function renderProfileResults(p) {
+    if (!p) return;
+    const m = computeMetrics(p);
+    $('#res-bmi').textContent = m.bmi;
+    $('#res-bmr').textContent = m.bmr.toLocaleString();
+    $('#res-tdee').textContent = m.tdee.toLocaleString();
+
+    const catEl = $('#res-bmi-cat');
+    catEl.textContent = m.cat;
+    const palette = {
+      mist:  'bg-mist/15 text-mist',
+      sage:  'bg-sage/20 text-sage',
+      amber: 'bg-[#F4E9CE] text-[#B8902F]',
+      red:   'bg-red-50 text-red-500',
+    };
+    catEl.className = 'mt-2 inline-block px-3 py-1 rounded-full text-base font-medium ' + (palette[m.color] || palette.sage);
+
+    const advice = {
+      mist:  '體重偏輕，記得均衡攝取蛋白質、別漏餐，把體力補起來 💪',
+      sage:  '體位很健康，繼續保持現在的好習慣就對了，全家都替您開心 🥰',
+      amber: '體重稍微超標一點點，飯後多走走、含糖少一點，慢慢調整就好 🌱',
+      red:   '體重需要多留意，搭配飲食指南和規律運動，一步一步來，我們陪您 ❤️',
+    };
+    $('#res-advice').textContent = advice[m.color] || advice.sage;
+
+    $('#profile-results').classList.remove('hidden');
+  }
+
+  function handleProfileSubmit(e) {
+    e.preventDefault();
+    const f = e.target;
+    const profile = {
+      height: numOrNull(f.height.value),
+      weight: numOrNull(f.weight.value),
+      age: numOrNull(f.age.value),
+      sex: f.sex.value,
+      activity: f.activity.value,
+      updated_at: new Date().toISOString(),
+    };
+    Store.saveProfile(profile);
+    renderProfileResults(profile);
+    showLoveToast(); // 沿用愛的鼓勵彈窗
+  }
+
+  function prefillProfile() {
+    const p = Store.getProfile();
+    if (!p) return false;
+    const f = $('#form-profile');
+    if (p.height != null) f.height.value = p.height;
+    if (p.weight != null) f.weight.value = p.weight;
+    if (p.age != null) f.age.value = p.age;
+    if (p.sex) f.sex.value = p.sex;
+    if (p.activity) f.activity.value = p.activity;
+    renderProfileResults(p);
+    return true;
   }
 
   // ---------- 截圖匯報（html2canvas → PNG） ----------
@@ -551,16 +645,17 @@
   }
 
   // ---------- Tabs 切換 ----------
+  function activateTab(tab) {
+    const btn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+    if (!btn) return;
+    $$('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+    $$('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
+    if (tab === 'analytics' && typeof window.refreshCharts === 'function') window.refreshCharts();
+  }
+
   function setupTabs() {
     $$('.tab-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const tab = btn.dataset.tab;
-        $$('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
-        $$('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + tab));
-        if (tab === 'analytics' && typeof window.refreshCharts === 'function') {
-          window.refreshCharts();
-        }
-      });
+      btn.addEventListener('click', () => activateTab(btn.dataset.tab));
     });
   }
 
@@ -578,6 +673,10 @@
     // 表單送出
     $('#form-daily').addEventListener('submit', handleDailySubmit);
     $('#form-exercise').addEventListener('submit', handleExerciseSubmit);
+    $('#form-profile').addEventListener('submit', handleProfileSubmit);
+
+    // 個人資料：有存過就帶出結果；還沒填過則自動停在「我的資料」入口頁
+    if (!prefillProfile()) activateTab('profile');
 
     // 彈窗關閉
     $('#love-close').addEventListener('click', hideLoveToast);
