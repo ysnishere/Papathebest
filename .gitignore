@@ -1,0 +1,16 @@
+# 相依套件（本專案用 CDN，不需要）
+node_modules/
+
+# 編輯器 / 預覽工具設定（本機開發用，部署不需要）
+.claude/
+.vscode/
+.idea/
+
+# 系統檔
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 暫存 / 日誌
+*.log
+*.tmp

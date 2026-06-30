@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>楊忪霖 健康追蹤｜家庭關懷紀錄本</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- html2canvas CDN：一鍵截圖匯報 -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+  <script>
+    // Muji / Apple 風格的 Tailwind 主題擴充
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            paper:   '#F7F4EF', // 柔和米白底
+            cream:   '#FBF9F5',
+            wood:    '#A88B6A', // 溫暖木質調
+            woodDk:  '#8C7155',
+            sage:    '#8FA68E', // 柔和草綠（健康感）
+            mist:    '#7C99B4', // 輕科技灰藍
+            ink:     '#4A4540', // 主要文字（暖灰）
+            inkSoft: '#7A736B',
+          },
+          fontFamily: {
+            sans: ['"Noto Sans TC"', '"PingFang TC"', '"Microsoft JhengHei"', 'system-ui', 'sans-serif'],
+          },
+          boxShadow: {
+            soft: '0 4px 20px rgba(140, 113, 85, 0.10)',
+            card: '0 2px 12px rgba(74, 69, 64, 0.06)',
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Noto Sans TC 字體 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* 長輩友善：放大基準字體 */
+    html { font-size: 18px; }
+    body { -webkit-font-smoothing: antialiased; }
+
+    /* 愛心彈窗動畫 */
+    @keyframes heartPop {
+      0%   { transform: scale(0.6); opacity: 0; }
+      60%  { transform: scale(1.08); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes floatUp {
+      0%   { transform: translateY(8px); opacity: 0; }
+      100% { transform: translateY(0);   opacity: 1; }
+    }
+    @keyframes warmGlow {
+      0%   { background-color: rgba(168, 139, 106, 0); }
+      50%  { background-color: rgba(168, 139, 106, 0.18); }
+      100% { background-color: rgba(168, 139, 106, 0); }
+    }
+    .anim-heart  { animation: heartPop 0.5s cubic-bezier(.22,1,.36,1) both; }
+    .anim-float  { animation: floatUp 0.4s ease both; }
+
+    /* Tabs 切換 */
+    .tab-btn.active {
+      background-color: #FBF9F5;
+      color: #8C7155;
+      box-shadow: 0 2px 12px rgba(74,69,64,0.08);
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; animation: floatUp 0.35s ease both; }
+
+    /* 表單元件統一加大，長輩好點選 */
+    .field-label { font-size: 1.05rem; font-weight: 500; color: #4A4540; margin-bottom: .4rem; display:block; }
+    .field-input {
+      width: 100%; font-size: 1.15rem; padding: .85rem 1rem;
+      border: 1.5px solid #E6DFD4; border-radius: 0.9rem; background: #FBF9F5;
+      color: #4A4540; transition: border-color .15s, box-shadow .15s;
+    }
+    .field-input:focus {
+      outline: none; border-color: #A88B6A;
+      box-shadow: 0 0 0 4px rgba(168,139,106,0.15);
+    }
+  </style>
+</head>
+
+<body class="bg-paper text-ink font-sans min-h-screen">
+
+  <!-- 頂部標題 -->
+  <header class="bg-cream/80 backdrop-blur border-b border-[#ECE5DA] sticky top-0 z-30">
+    <div class="max-w-4xl mx-auto px-5 py-4 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-2xl bg-sage/20 flex items-center justify-center text-2xl">🌿</div>
+        <div>
+          <h1 class="text-xl sm:text-2xl font-bold text-woodDk leading-tight">楊忪霖 的健康紀錄本</h1>
+          <p class="text-sm text-inkSoft">家人陪您一起，每天都更健康一點點</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="btn-export" class="px-3 py-2 rounded-xl text-sm bg-white border border-[#E6DFD4] text-inkSoft hover:text-woodDk hover:border-wood transition">⬇️ 匯出備份</button>
+        <label class="px-3 py-2 rounded-xl text-sm bg-white border border-[#E6DFD4] text-inkSoft hover:text-woodDk hover:border-wood transition cursor-pointer">
+          ⬆️ 匯入
+          <input id="file-import" type="file" accept="application/json" class="hidden" />
+        </label>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="max-w-4xl mx-auto px-5 pb-3">
+      <div class="grid grid-cols-2 gap-2 bg-[#EFE9DF] p-1.5 rounded-2xl">
+        <button data-tab="input" class="tab-btn active text-lg font-medium py-3 rounded-xl text-inkSoft transition">📝 數據輸入面版</button>
+        <button data-tab="analytics" class="tab-btn text-lg font-medium py-3 rounded-xl text-inkSoft transition">📊 健康分析圖表</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-5 py-6 pb-24">
+
+    <!-- ============ 面版一：數據輸入 ============ -->
+    <section id="panel-input" class="tab-panel active space-y-6">
+
+      <!-- 模組 A-1：飲食 / 用藥 / 數值 紀錄 -->
+      <form id="form-daily" class="bg-cream rounded-3xl shadow-card border border-[#EFE9DF] p-6 space-y-5">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">🍚</span>
+          <h2 class="text-xl font-bold text-woodDk">飲食・用藥・身體數值</h2>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label class="field-label">紀錄時間</label>
+            <input type="datetime-local" name="timestamp" class="field-input" required />
+          </div>
+          <div>
+            <label class="field-label">這是哪一餐？</label>
+            <select name="meal_type" class="field-input">
+              <option value="breakfast">早餐</option>
+              <option value="lunch">午餐</option>
+              <option value="dinner">晚餐</option>
+              <option value="snack">點心 / 宵夜</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="field-label">這一餐吃了什麼？（越詳細越好）</label>
+          <textarea name="meal_desc" rows="2" class="field-input" placeholder="例如：燕麥片一碗、水煮蛋一顆、無糖豆漿一杯"></textarea>
+        </div>
+
+        <div>
+          <label class="field-label">這餐的醣類（澱粉/糖分）大概多少？</label>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="carb-pill"><input type="radio" name="carbs" value="low" class="sr-only"><span>🟢 較少</span></label>
+            <label class="carb-pill"><input type="radio" name="carbs" value="medium" checked class="sr-only"><span>🟡 中等</span></label>
+            <label class="carb-pill"><input type="radio" name="carbs" value="high" class="sr-only"><span>🔴 較多</span></label>
+          </div>
+        </div>
+
+        <!-- 用藥 -->
+        <div>
+          <label class="field-label">用藥紀錄</label>
+          <div id="med-list" class="space-y-2"></div>
+          <button type="button" id="btn-add-med" class="mt-2 text-mist font-medium hover:text-woodDk transition">＋ 再加一種藥</button>
+        </div>
+
+        <!-- 身體數值 -->
+        <div class="bg-white/60 rounded-2xl p-4 space-y-4 border border-[#EFE9DF]">
+          <p class="font-medium text-ink">📋 身體數值（沒量的可以留空）</p>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label class="field-label">血糖 (mg/dL)</label>
+              <input type="number" name="bs_value" class="field-input" placeholder="例如 120" />
+            </div>
+            <div>
+              <label class="field-label">血糖量測時機</label>
+              <select name="bs_period" class="field-input">
+                <option value="fasting">空腹</option>
+                <option value="before_meal">餐前</option>
+                <option value="after_meal_2h">餐後 2 小時</option>
+              </select>
+            </div>
+            <div>
+              <label class="field-label">血壓（收縮壓 / 舒張壓）</label>
+              <div class="flex items-center gap-2">
+                <input type="number" name="bp_sys" class="field-input" placeholder="高 (例 130)" />
+                <span class="text-2xl text-inkSoft">/</span>
+                <input type="number" name="bp_dia" class="field-input" placeholder="低 (例 80)" />
+              </div>
+            </div>
+            <div>
+              <label class="field-label">心跳 (次/分)</label>
+              <input type="number" name="heart_rate" class="field-input" placeholder="例如 72" />
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" class="w-full text-xl font-bold py-4 rounded-2xl bg-wood text-white shadow-soft hover:bg-woodDk active:scale-[.99] transition">
+          💾 送出儲存
+        </button>
+      </form>
+
+      <!-- 模組 A-2：運動紀錄 -->
+      <form id="form-exercise" class="bg-cream rounded-3xl shadow-card border border-[#EFE9DF] p-6 space-y-5">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">🏃</span>
+          <h2 class="text-xl font-bold text-woodDk">運動紀錄（含運動前後對比）</h2>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label class="field-label">運動項目</label>
+            <select name="ex_type" class="field-input" required>
+              <option value="散步">散步</option>
+              <option value="超慢跑">超慢跑</option>
+              <option value="伸展">伸展</option>
+              <option value="深蹲">深蹲</option>
+              <option value="重訓">重訓</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">運動強度</label>
+            <select name="ex_intensity" class="field-input">
+              <option value="low">輕鬆</option>
+              <option value="moderate" selected>中等</option>
+              <option value="high">較喘 / 吃力</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">開始時間</label>
+            <input type="datetime-local" name="ex_start" class="field-input" required />
+          </div>
+          <div>
+            <label class="field-label">結束時間</label>
+            <input type="datetime-local" name="ex_end" class="field-input" />
+          </div>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-4">
+          <!-- 運動前 -->
+          <fieldset class="rounded-2xl p-4 border border-[#EFE9DF] bg-white/60 space-y-3">
+            <legend class="px-2 font-bold text-sage">運動「前」</legend>
+            <div>
+              <label class="field-label">血糖</label>
+              <input type="number" name="before_bs" class="field-input" placeholder="mg/dL" />
+            </div>
+            <div>
+              <label class="field-label">血壓（高/低）</label>
+              <div class="flex items-center gap-2">
+                <input type="number" name="before_sys" class="field-input" placeholder="高" />
+                <span class="text-2xl text-inkSoft">/</span>
+                <input type="number" name="before_dia" class="field-input" placeholder="低" />
+              </div>
+            </div>
+            <div>
+              <label class="field-label">心跳</label>
+              <input type="number" name="before_hr" class="field-input" placeholder="次/分" />
+            </div>
+          </fieldset>
+
+          <!-- 運動後 -->
+          <fieldset class="rounded-2xl p-4 border border-[#EFE9DF] bg-white/60 space-y-3">
+            <legend class="px-2 font-bold text-mist">運動「後」</legend>
+            <div>
+              <label class="field-label">血糖</label>
+              <input type="number" name="after_bs" class="field-input" placeholder="mg/dL" />
+            </div>
+            <div>
+              <label class="field-label">血壓（高/低）</label>
+              <div class="flex items-center gap-2">
+                <input type="number" name="after_sys" class="field-input" placeholder="高" />
+                <span class="text-2xl text-inkSoft">/</span>
+                <input type="number" name="after_dia" class="field-input" placeholder="低" />
+              </div>
+            </div>
+            <div>
+              <label class="field-label">心跳</label>
+              <input type="number" name="after_hr" class="field-input" placeholder="次/分" />
+            </div>
+          </fieldset>
+        </div>
+
+        <button type="submit" class="w-full text-xl font-bold py-4 rounded-2xl bg-sage text-white shadow-soft hover:brightness-95 active:scale-[.99] transition">
+          💾 送出儲存
+        </button>
+      </form>
+
+      <!-- 最近紀錄 -->
+      <div class="bg-cream rounded-3xl shadow-card border border-[#EFE9DF] p-6">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xl font-bold text-woodDk">🗒️ 最近的紀錄</h2>
+          <div class="flex gap-2">
+            <button id="btn-report" class="text-sm px-3 py-2 rounded-xl bg-white border border-[#E6DFD4] text-inkSoft hover:text-woodDk hover:border-wood transition">📤 文字匯報</button>
+            <button id="btn-snapshot" class="text-sm px-3 py-2 rounded-xl bg-wood text-white hover:bg-woodDk transition">📸 截圖匯報</button>
+          </div>
+        </div>
+        <div id="recent-list" class="space-y-2 text-[1.05rem]"></div>
+      </div>
+    </section>
+
+    <!-- ============ 面版二：分析圖表 ============ -->
+    <section id="panel-analytics" class="tab-panel space-y-6">
+      <!-- 洞察小卡 -->
+      <div id="insight-cards" class="grid sm:grid-cols-2 gap-4"></div>
+
+      <div class="bg-cream rounded-3xl shadow-card border border-[#EFE9DF] p-6">
+        <h2 class="text-xl font-bold text-woodDk mb-1">血糖 × 有氧運動</h2>
+        <p class="text-sm text-inkSoft mb-4">時間軸上的血糖變化，並標記「超慢跑」與「散步」發生的時間點。</p>
+        <canvas id="chart-bloodsugar" height="160"></canvas>
+      </div>
+
+      <div class="bg-cream rounded-3xl shadow-card border border-[#EFE9DF] p-6">
+        <h2 class="text-xl font-bold text-woodDk mb-1">阻力訓練 × 心血管反應</h2>
+        <p class="text-sm text-inkSoft mb-4">比較「重訓 / 深蹲」與「伸展」運動前後的血壓與心跳變化幅度。</p>
+        <canvas id="chart-cardio" height="160"></canvas>
+      </div>
+    </section>
+  </main>
+
+  <!-- 截圖匯報用的卡片（畫面外，由 html2canvas 擷取） -->
+  <div id="report-card-wrap" style="position:fixed; left:-9999px; top:0;">
+    <div id="report-card" class="bg-gradient-to-b from-cream to-[#FBEEE6] p-8" style="width:520px;">
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-12 h-12 rounded-2xl bg-sage/25 flex items-center justify-center text-2xl">🌿</div>
+        <div>
+          <div class="text-2xl font-bold text-woodDk">楊忪霖 健康日報</div>
+          <div id="report-date" class="text-inkSoft"></div>
+        </div>
+      </div>
+      <div id="report-body" class="space-y-4 text-[1.05rem] text-ink"></div>
+      <div class="mt-6 pt-4 border-t border-[#E6D8CC] text-center text-woodDk font-medium">— 由家人陪伴記錄 ❤️</div>
+    </div>
+  </div>
+
+  <!-- 截圖預覽彈窗 -->
+  <div id="snap-preview" class="fixed inset-0 z-50 hidden items-center justify-center p-5 bg-ink/40 backdrop-blur-sm">
+    <div class="anim-float bg-cream rounded-3xl shadow-soft border border-[#EFE9DF] max-w-md w-full p-5 flex flex-col" style="max-height:90vh;">
+      <h3 class="text-lg font-bold text-woodDk mb-3 text-center">這是要分享的圖，看一下 👀</h3>
+      <div class="flex-1 overflow-auto rounded-2xl border border-[#EFE9DF] bg-white p-2 mb-4">
+        <img id="snap-preview-img" alt="健康日報預覽" class="w-full rounded-xl" />
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <button id="snap-cancel" class="text-lg font-medium py-3 rounded-2xl bg-white border border-[#E6DFD4] text-inkSoft hover:text-woodDk hover:border-wood transition">關閉</button>
+        <button id="snap-download" class="text-lg font-bold py-3 rounded-2xl bg-wood text-white hover:bg-woodDk active:scale-[.99] transition">⬇️ 下載 PNG</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 模組 B：愛的鼓勵彈窗 ============ -->
+  <div id="love-toast" class="fixed inset-0 z-50 hidden items-center justify-center p-5 bg-ink/30 backdrop-blur-sm">
+    <div id="love-card" class="anim-heart bg-gradient-to-b from-cream to-[#FBEEE6] rounded-3xl shadow-soft border border-[#F0E2D6] max-w-sm w-full p-8 text-center">
+      <div class="text-6xl mb-3 anim-float">❤️</div>
+      <p id="love-text" class="text-2xl font-bold text-woodDk leading-relaxed mb-6">爸爸我們都愛你喔～❤️</p>
+      <button id="love-close" class="w-full text-lg font-bold py-3.5 rounded-2xl bg-wood text-white hover:bg-woodDk active:scale-[.99] transition">
+        謝謝孩子 🥰
+      </button>
+    </div>
+  </div>
+
+  <!-- 碳水選項的小樣式（pill 高亮） -->
+  <style>
+    .carb-pill { cursor:pointer; }
+    .carb-pill span {
+      display:block; text-align:center; padding:.75rem; border-radius:.9rem;
+      border:1.5px solid #E6DFD4; background:#FBF9F5; font-size:1.05rem; color:#7A736B;
+      transition:.15s;
+    }
+    .carb-pill input:checked + span {
+      border-color:#A88B6A; background:#fff; color:#8C7155; font-weight:700;
+      box-shadow:0 0 0 4px rgba(168,139,106,.12);
+    }
+  </style>
+
+  <!-- 核心邏輯 -->
+  <script src="src/main.js"></script>
+  <!-- 圖表邏輯 -->
+  <script src="src/charts.js"></script>
+</body>
+</html>
